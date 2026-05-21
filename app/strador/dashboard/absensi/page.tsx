@@ -1,0 +1,363 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { getInitials, getAvatarColor } from "@/lib/mock-data";
+import { useMembers, useAttendance, AttendanceMonth, logEdit, useEditLogs, isCellHadir } from "@/lib/firestore";
+import { db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import {
+  Download,
+  Save,
+  Search,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Minus,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { format, getDaysInMonth, isWeekend, addMonths, subMonths, isSameMonth, isAfter } from "date-fns";
+import { id } from "date-fns/locale";
+import { MonthSelector } from "@/components/MonthSelector";
+import { exportAttendanceCSV } from "@/lib/utils/export";
+
+// Dynamic date logic will be inside the component
+
+export default function AbsensiPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const monthStr = format(currentDate, "MMMM-yyyy", { locale: id });
+  
+  const { members, loading: loadingMembers } = useMembers();
+  const { attendance: remoteAttendance, loading: loadingAtt } = useAttendance(monthStr);
+  const { editLogs } = useEditLogs(30);
+  const [attendance, setAttendance] = useState<AttendanceMonth>({});
+  const [search, setSearch] = useState("");
+  const [logOpen, setLogOpen] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    if (!hasChanges && !loadingAtt) {
+      setAttendance(remoteAttendance);
+    }
+  }, [remoteAttendance, hasChanges, loadingAtt]);
+
+  const handleMonthChange = (date: Date) => {
+    if (hasChanges) {
+      toast.error("Simpan perubahan terlebih dahulu!");
+      return;
+    }
+    setCurrentDate(date);
+  };
+
+  const TOTAL_DAYS = getDaysInMonth(currentDate);
+  const now = new Date();
+  const isCurrentMonth = isSameMonth(currentDate, now);
+  const TODAY_DAY = isCurrentMonth ? now.getDate() : isAfter(now, currentDate) ? TOTAL_DAYS : 0;
+  
+  const weekends = new Set<number>();
+  for (let d = 1; d <= TOTAL_DAYS; d++) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), d);
+    if (isWeekend(date)) weekends.add(d);
+  }
+
+  const filteredMembers = members.filter((m) => m.status === "aktif").filter((m) =>
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.id.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleCell = (memberId: string, day: number) => {
+    if (day > TODAY_DAY) return;
+    const current = attendance[memberId]?.[day];
+    const currentlyHadir = isCellHadir(current);
+    setAttendance((prev) => ({
+      ...prev,
+      [memberId]: {
+        ...prev[memberId],
+        [day]: !currentlyHadir, // admin always writes boolean
+      },
+    }));
+    setHasChanges(true);
+  };
+
+  const countHadir = (memberId: string) =>
+    Object.values(attendance[memberId] || {}).filter(isCellHadir).length;
+
+  const totalHadir = filteredMembers.reduce((s, m) => s + countHadir(m.id), 0);
+  const maxPossible = filteredMembers.length * 16; // ~16 working days so far
+  const persen = maxPossible > 0 ? ((totalHadir / maxPossible) * 100).toFixed(1) : "0.0";
+
+  return (
+    <div className="p-6 min-h-full flex flex-col gap-5">
+      {/* Reset Confirm Modal */}
+      {showReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReset(false)} />
+          <div className="relative z-10 rounded-2xl p-6 w-full max-w-sm mx-4"
+            style={{ background: "#16161F", border: "1px solid #2A2A3A", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ background: "rgba(225,112,85,0.15)" }}>
+              <RotateCcw size={20} className="text-[var(--color-red)]" />
+            </div>
+            <h3 className="text-lg font-bold text-white text-center mb-2">Reset Seluruh Absensi?</h3>
+            <p className="text-sm text-[var(--color-text-secondary)] text-center mb-6">
+              Semua data absensi dari <b className="text-white">seluruh bulan</b> akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowReset(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-[var(--color-text-secondary)] transition-all hover:text-white"
+                style={{ background: "#1A1A24", border: "1px solid #2A2A3A" }}>
+                Batal
+              </button>
+              <button onClick={async () => {
+                const { getDocs, collection, deleteDoc } = await import("firebase/firestore");
+                const snap = await getDocs(collection(db, "attendance"));
+                await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+                
+                setAttendance({});
+                setShowReset(false);
+                setHasChanges(false);
+                toast.success("Seluruh data absensi berhasil dihapus");
+              }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: "var(--color-red)" }}>
+                Reset Semua
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Row */}
+      <div className="flex items-center gap-6">
+        <div className="flex-1">
+          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-widest mb-1">Total Kehadiran</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black text-white font-mono">
+              {totalHadir.toLocaleString("id")}
+            </span>
+            <span className="text-[var(--color-text-muted)] text-lg font-mono">/ {maxPossible.toLocaleString("id")}</span>
+          </div>
+        </div>
+        <div className="h-12 w-px bg-[var(--color-border)]" />
+        <div className="flex-1">
+          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-widest mb-1">Persentase</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black font-mono" style={{ color: "var(--color-green)" }}>
+              {persen}%
+            </span>
+            <span className="text-[var(--color-green)] text-lg">↗</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={() => setShowReset(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+            style={{ background: "rgba(225,112,85,0.1)", color: "var(--color-red)", border: "1px solid rgba(225,112,85,0.2)" }}>
+            <RotateCcw size={14} />
+            Reset
+          </button>
+          <button
+            onClick={() => {
+              const activeMembers = members.filter((m) => m.status === "aktif");
+              const exportRows = activeMembers.map((m) => ({
+                name: m.name,
+                id: m.id,
+                days: attendance[m.id] || {},
+                total: countHadir(m.id),
+                persen: `${((countHadir(m.id) / TOTAL_DAYS) * 100).toFixed(0)}%`,
+                totalDays: TOTAL_DAYS,
+              }));
+              exportAttendanceCSV(
+                exportRows,
+                `Absensi_GTA_Mabar_${monthStr}`,
+                format(currentDate, "MMMM yyyy", { locale: id })
+              );
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+            style={{ background: "var(--color-bg-tertiary)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
+            <Download size={14} />
+            Export CSV
+          </button>
+          <button onClick={async () => {
+            await setDoc(doc(db, "attendance", monthStr), attendance);
+            await logEdit("admin@gtamabar.com", `Absensi untuk bulan ${monthStr} diperbarui`);
+            setHasChanges(false);
+            toast.success("Absensi berhasil disimpan");
+          }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${hasChanges ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"}`}
+            style={{ background: hasChanges ? "var(--color-accent)" : "var(--color-bg-tertiary)", color: "white", border: "1px solid transparent" }}>
+            <Save size={14} />
+            Save Changes
+          </button>
+        </div>
+      </div>
+
+      {/* Spreadsheet */}
+      <div className="rounded-2xl overflow-hidden flex flex-col"
+        style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
+        {/* Search & Month Navigator */}
+        <div className="px-4 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
+          <div className="relative max-w-xs w-full">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search members..."
+              className="w-full pl-9 pr-4 py-2 rounded-lg text-sm text-white placeholder-[var(--color-text-muted)] outline-none transition-all"
+              style={{ background: "var(--color-bg-tertiary)", border: "1px solid var(--color-border)" }}
+              onFocus={(e) => (e.target.style.borderColor = "#6C5CE7")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
+            />
+          </div>
+          <MonthSelector currentDate={currentDate} onChange={handleMonthChange} />
+        </div>
+
+        {/* Grid */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
+            <thead>
+              <tr style={{ background: "rgba(26,26,36,0.5)" }}>
+                <th className="sticky left-0 z-10 text-left px-4 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider w-48"
+                  style={{ background: "var(--color-bg-secondary)" }}>
+                  Name / ID
+                </th>
+                {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map((d) => (
+                  <th key={d}
+                    className="text-center py-3 text-xs font-semibold w-8"
+                    style={{
+                      color: weekends.has(d) ? "var(--color-red)" : d > TODAY_DAY ? "var(--color-text-muted)" : "var(--color-text-muted)",
+                      opacity: d > TODAY_DAY ? 0.4 : 1,
+                    }}>
+                    {d}
+                  </th>
+                ))}
+                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Total</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredMembers.map((member, ri) => {
+                const hadir = countHadir(member.id);
+                const pct = ((hadir / 22) * 100).toFixed(0);
+                return (
+                  <tr key={member.id}
+                    className="border-t transition-colors hover:bg-white/[0.02]"
+                    style={{ borderColor: "var(--color-border-subtle)" }}>
+                    {/* Name cell */}
+                    <td className="sticky left-0 z-10 px-4 py-2.5"
+                      style={{ background: ri % 2 === 0 ? "var(--color-bg-secondary)" : "#13131B" }}>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${getAvatarColor(member.id)}`}>
+                          {getInitials(member.name)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm leading-none">{member.name}</p>
+                          <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{member.id}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Day cells */}
+                    {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map((d) => {
+                      const isFuture = d > TODAY_DAY;
+                      const isWeekend = weekends.has(d);
+                      const isHadir = isCellHadir(attendance[member.id]?.[d]);
+                      const canEdit = !isFuture;
+
+                      return (
+                        <td key={d} className="text-center py-1.5 px-0.5">
+                          <button
+                            onClick={() => toggleCell(member.id, d)}
+                            disabled={!canEdit}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto text-xs font-bold transition-all
+                              ${isFuture
+                                ? "cursor-default opacity-25"
+                                : isHadir
+                                ? "hover:opacity-80 active:scale-90"
+                                : "hover:bg-white/5 active:scale-90"
+                              }`}
+                            style={isHadir
+                              ? { background: "rgba(0,184,148,0.2)", color: "var(--color-green)" }
+                              : isWeekend
+                              ? { color: "var(--color-text-muted)" }
+                              : {}
+                            }>
+                            {isHadir ? (
+                              <span className="text-base leading-none">✓</span>
+                            ) : isWeekend ? (
+                              <span className="text-[10px] text-[var(--color-text-muted)]">—</span>
+                            ) : isFuture ? (
+                              <span className="text-[10px] text-[var(--color-text-muted)]">·</span>
+                            ) : (
+                              <span className="text-[10px] text-[var(--color-text-muted)]">—</span>
+                            )}
+                          </button>
+                        </td>
+                      );
+                    })}
+
+                    <td className="text-center px-3 py-2.5">
+                      <span className="font-bold font-mono text-white text-sm px-2 py-0.5 rounded-md"
+                        style={{ background: hadir >= 10 ? "rgba(0,184,148,0.15)" : "rgba(225,112,85,0.15)", color: hadir >= 10 ? "var(--color-green)" : "var(--color-red)" }}>
+                        {hadir}
+                      </span>
+                    </td>
+                    <td className="text-center px-3 py-2.5 text-sm font-mono text-[var(--color-text-secondary)]">
+                      {pct}%
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Log Edit Panel */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
+        <button onClick={() => setLogOpen(!logOpen)}
+          className="w-full flex items-center gap-2.5 px-5 py-4 text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+          <Clock size={15} />
+          Log Edit
+          <span className="ml-auto px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(108,92,231,0.15)", color: "#8B7FE8" }}>
+            {editLogs.length}
+          </span>
+          {logOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {logOpen && (
+          <div className="border-t border-[var(--color-border)]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "rgba(26,26,36,0.5)" }}>
+                  {["Admin", "Keterangan Perubahan", "Waktu"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {editLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-6 text-center text-sm text-[var(--color-text-muted)]">
+                      Belum ada log perubahan untuk bulan ini.
+                    </td>
+                  </tr>
+                ) : editLogs.map((log) => (
+                  <tr key={log.id} className="border-t hover:bg-white/[0.02] transition-colors" style={{ borderColor: "var(--color-border-subtle)" }}>
+                    <td className="px-5 py-3 text-[var(--color-text-secondary)] text-xs">{log.adminEmail}</td>
+                    <td className="px-5 py-3 text-white text-sm">{log.changes}</td>
+                    <td className="px-5 py-3 text-[var(--color-text-muted)] font-mono text-xs">
+                      {new Date(log.timestamp).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

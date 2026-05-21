@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #0A0A0F;
+  --color-bg-secondary: #111118;
+  --color-bg-tertiary: #1A1A24;
+  --color-bg-card: #16161F;
+  --color-border: #2A2A3A;
+  --color-border-subtle: #1E1E2E;
+  --color-accent: #6C5CE7;
+  --color-accent-hover: #5A4BCD;
+  --color-accent-muted: rgba(108, 92, 231, 0.15);
+  --color-green: #00B894;
+  --color-green-muted: rgba(0, 184, 148, 0.15);
+  --color-red: #E17055;
+  --color-red-muted: rgba(225, 112, 85, 0.15);
+  --color-yellow: #FDCB6E;
+  --color-yellow-muted: rgba(253, 203, 110, 0.15);
+  --color-text-primary: #F0F0F5;
+  --color-text-secondary: #8888A0;
+  --color-text-muted: #555565;
+
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
+
+  html {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
+  /* Number inputs */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+}
+
+@layer utilities {
+  .font-mono { font-family: var(--font-mono); }
+
+  .glass {
+    background: rgba(17, 17, 24, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(108, 92, 231, 0.4), 0 0 40px rgba(108, 92, 231, 0.15);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 10px rgba(0, 184, 148, 0.3);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #8B7FE8 0%, #6C5CE7 50%, #5A4BCD 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Confetti */
+  @keyframes confetti-fall {
+    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100px) rotate(720deg); opacity: 0; }
+  }
+
+  .confetti-piece {
+    animation: confetti-fall 1.5s ease-out forwards;
+  }
+}
