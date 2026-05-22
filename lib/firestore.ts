@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy, addDoc, limit } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, query, orderBy, addDoc, limit } from "firebase/firestore";
 import { MemberStatus } from "./mock-data";
 
 export type Member = {
@@ -109,7 +109,7 @@ export function useSettings() {
     const docRef = doc(db, "config", "settings");
     const unsub = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
-        setSettings(snap.data() as any);
+        setSettings(snap.data() as { minAbsen: number; maxAbsen: number; saldo: number; motivasi: string });
       }
       setLoading(false);
     });

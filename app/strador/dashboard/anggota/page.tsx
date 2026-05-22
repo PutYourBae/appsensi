@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getInitials, getAvatarColor, MemberStatus } from "@/lib/mock-data";
+import { getInitials, getAvatarColor } from "@/lib/mock-data";
 import { useMembers, Member } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
@@ -22,7 +22,7 @@ export default function AnggotaPage() {
     return 0;
   });
 
-  const filteredMembers = members.filter((m) =>
+  const filteredMembers = sortedMembers.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.id.toLowerCase().includes(search.toLowerCase())
   );

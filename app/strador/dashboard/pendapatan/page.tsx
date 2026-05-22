@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatRupiah, getInitials } from "@/lib/mock-data";
-import { useMembers, useSettings, useAllAttendance, isCellHadir } from "@/lib/firestore";
+import { formatRupiah } from "@/lib/mock-data";
+import { useMembers, useSettings, useAllAttendance } from "@/lib/firestore";
 import {
   Wallet,
   FileText,

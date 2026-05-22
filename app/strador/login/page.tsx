@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
@@ -22,7 +23,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/strador/dashboard");
-    } catch (err) {
+    } catch {
       setError(true);
       setLoading(false);
     }
@@ -134,9 +135,9 @@ export default function LoginPage() {
 
         {/* Bottom link */}
         <p className="text-center mt-4 text-xs text-[var(--color-text-muted)]">
-          <a href="/" className="hover:text-[var(--color-accent)] transition-colors">
+          <Link href="/" className="hover:text-[var(--color-accent)] transition-colors">
             ← Kembali ke halaman absensi
-          </a>
+          </Link>
         </p>
       </div>
     </div>

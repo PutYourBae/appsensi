@@ -3,15 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
   CalendarDays,
   Users,
   Wallet,
   Settings,
   LogOut,
-  User,
-  ChevronLeft,
-  ChevronRight,
   Bell,
   HelpCircle,
 } from "lucide-react";

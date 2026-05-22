@@ -10,16 +10,12 @@ import {
   Save,
   Search,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   ChevronUp,
   ChevronDown,
-  Plus,
-  Minus,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { format, getDaysInMonth, isWeekend, addMonths, subMonths, isSameMonth, isAfter } from "date-fns";
+import { format, getDaysInMonth, isWeekend, isSameMonth, isAfter } from "date-fns";
 import { id } from "date-fns/locale";
 import { MonthSelector } from "@/components/MonthSelector";
 import { exportAttendanceCSV } from "@/lib/utils/export";
@@ -30,7 +26,7 @@ export default function AbsensiPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const monthStr = format(currentDate, "MMMM-yyyy", { locale: id });
   
-  const { members, loading: loadingMembers } = useMembers();
+  const { members } = useMembers();
   const { attendance: remoteAttendance, loading: loadingAtt } = useAttendance(monthStr);
   const { editLogs } = useEditLogs(30);
   const [attendance, setAttendance] = useState<AttendanceMonth>({});

@@ -115,10 +115,6 @@ export default function UserPage() {
 
   if (loadingMembers) return null;
 
-  const availableMembers = activeMembers.filter(
-    (m) => !alreadyAbsenIds.includes(m.id)
-  );
-
   return (
     <main className="min-h-screen flex flex-col items-center justify-start py-16 px-4"
       style={{ background: "radial-gradient(ellipse at top, #1A1030 0%, #0A0A0F 60%)" }}>
@@ -149,7 +145,7 @@ export default function UserPage() {
             <div className="text-6xl mb-4">🎉</div>
             <h2 className="text-2xl font-bold text-white mb-3">Absensi Berhasil!</h2>
             <p className="text-lg text-[var(--color-text-secondary)] italic leading-relaxed">
-              "{motivasi}"
+              &quot;{motivasi}&quot;
             </p>
             <p className="text-sm text-[var(--color-text-muted)] mt-6">
               Klik di mana saja untuk tutup
