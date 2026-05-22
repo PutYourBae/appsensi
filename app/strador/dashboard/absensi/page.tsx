@@ -34,6 +34,7 @@ export default function AbsensiPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     if (!hasChanges && !loadingAtt) {
@@ -85,6 +86,17 @@ export default function AbsensiPage() {
   const totalHadir = filteredMembers.reduce((s, m) => s + countHadir(m.id), 0);
   const maxPossible = filteredMembers.length * 16; // ~16 working days so far
   const persen = maxPossible > 0 ? ((totalHadir / maxPossible) * 100).toFixed(1) : "0.0";
+
+  // Daily summary: count how many active members were present on each working day
+  const allActiveMembers = members.filter((m) => m.status === "aktif");
+  const dailySummary = Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1)
+    .filter((day) => !weekends.has(day) && day <= TODAY_DAY)
+    .map((day) => {
+      const count = allActiveMembers.filter((m) => isCellHadir(attendance[m.id]?.[day])).length;
+      const total = allActiveMembers.length;
+      const status = count >= 15 ? (count > 15 ? "mantap" : "aman") : "bahaya";
+      return { day, count, total, status };
+    });
 
   return (
     <div className="p-6 min-h-full flex flex-col gap-5">
@@ -189,6 +201,79 @@ export default function AbsensiPage() {
             Save Changes
           </button>
         </div>
+      </div>
+
+      {/* Daily Summary Toggle Panel */}
+      <div className="rounded-2xl overflow-hidden"
+        style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
+        <button
+          onClick={() => setShowSummary((v) => !v)}
+          className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#00B894]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FDCB6E]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#E17055]" />
+            </div>
+            <span className="text-sm font-semibold text-white">Ringkasan Kehadiran Per Tanggal</span>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--color-bg-tertiary)", color: "var(--color-text-muted)" }}>
+              {dailySummary.length} hari kerja
+            </span>
+          </div>
+          <span className="text-[var(--color-text-muted)] text-sm">{showSummary ? "▲ Tutup" : "▼ Buka"}</span>
+        </button>
+
+        {showSummary && (
+          <div className="border-t border-[var(--color-border)]">
+            {/* Legend */}
+            <div className="px-5 py-3 flex items-center gap-5 border-b border-[var(--color-border)]">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#00B894]" />
+                <span className="text-xs text-[var(--color-text-muted)]">Mantap (15+)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#FDCB6E]" />
+                <span className="text-xs text-[var(--color-text-muted)]">Aman (= 15)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#E17055]" />
+                <span className="text-xs text-[var(--color-text-muted)]">Bahaya (&lt; 15)</span>
+              </div>
+            </div>
+
+            {/* Day grid */}
+            {dailySummary.length === 0 ? (
+              <div className="py-10 text-center text-sm text-[var(--color-text-muted)]">Belum ada data hari ini</div>
+            ) : (
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+                {dailySummary.map(({ day, count, total, status }) => {
+                  const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : "#E17055";
+                  const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : "rgba(225,112,85,0.1)";
+                  const label = status === "mantap" ? "Mantap" : status === "aman" ? "Aman" : "Bahaya";
+                  const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                  const dayName = format(dateObj, "EEE", { locale: id });
+                  return (
+                    <div key={day}
+                      className="rounded-xl p-3 flex flex-col gap-1.5 transition-all hover:scale-[1.02]"
+                      style={{ background: bg, border: `1px solid ${color}30` }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{dayName}</span>
+                        <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                      </div>
+                      <span className="text-2xl font-black text-white">{day}</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-base font-bold" style={{ color }}>{count}</span>
+                        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>/ {total}</span>
+                      </div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Spreadsheet */}

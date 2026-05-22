@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, getDaysInMonth, isWeekend } from "date-fns";
 import { id } from "date-fns/locale";
 import { CheckCircle2, Plus, Clock } from "lucide-react";
 import { getInitials, getAvatarColor } from "@/lib/mock-data";
@@ -26,6 +26,8 @@ export default function UserPage() {
   const dayNum = new Date().getDate();
 
   const [todayAttendees, setTodayAttendees] = useState<{ id: string; name: string; time: string }[]>([]);
+  const [monthAttendance, setMonthAttendance] = useState<Record<string, Record<number, unknown>>>({});
+  const [showDailySummary, setShowDailySummary] = useState(false);
 
   useEffect(() => {
     // Listen to the attendance document for this month
@@ -48,6 +50,8 @@ export default function UserPage() {
       // Sort most recent first based on time string
       todayList.sort((a, b) => b.time.localeCompare(a.time));
       setTodayAttendees(todayList);
+      // Also capture full month data for daily summary
+      setMonthAttendance(data as Record<string, Record<number, unknown>>);
     });
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,6 +118,26 @@ export default function UserPage() {
   };
 
   if (loadingMembers) return null;
+
+  // Build daily summary for the current month
+  const now2 = new Date();
+  const TOTAL_DAYS = getDaysInMonth(now2);
+  const TODAY_DAY = now2.getDate();
+  const weekendsSet = new Set<number>();
+  for (let d = 1; d <= TOTAL_DAYS; d++) {
+    if (isWeekend(new Date(now2.getFullYear(), now2.getMonth(), d))) weekendsSet.add(d);
+  }
+  const dailySummary = Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1)
+    .filter((day) => !weekendsSet.has(day) && day <= TODAY_DAY)
+    .map((day) => {
+      const count = activeMembers.filter((m) => {
+        const cell = monthAttendance[m.id]?.[day];
+        return cell === true || (typeof cell === "object" && cell !== null && (cell as Record<string, unknown>).hadir === true);
+      }).length;
+      const total = activeMembers.length;
+      const status = count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
+      return { day, count, total, status };
+    });
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-start py-16 px-4"
@@ -270,6 +294,67 @@ export default function UserPage() {
             </div>
           </div>
         )}
+
+        {/* Daily Summary Widget */}
+        <div className="mt-2 rounded-2xl overflow-hidden" style={{ background: "rgba(26,26,36,0.7)", border: "1px solid #2A2A3A" }}>
+          <button
+            onClick={() => setShowDailySummary((v) => !v)}
+            className="w-full px-5 py-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#00B894]" />
+                <span className="w-2 h-2 rounded-full bg-[#FDCB6E]" />
+                <span className="w-2 h-2 rounded-full bg-[#E17055]" />
+              </div>
+              <span className="text-sm font-semibold text-white">Status Kehadiran Bulan Ini</span>
+            </div>
+            <span className="text-[var(--color-text-muted)] text-xs">{showDailySummary ? "▲" : "▼"}</span>
+          </button>
+
+          {showDailySummary && (
+            <div className="border-t border-[#2A2A3A] p-3">
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#00B894]" />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">Mantap (15+)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#FDCB6E]" />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">Aman (=15)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#E17055]" />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">Bahaya (&lt;15)</span>
+                </div>
+              </div>
+              {dailySummary.length === 0 ? (
+                <p className="text-center text-xs text-[var(--color-text-muted)] py-4">Belum ada data hari ini</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {dailySummary.map(({ day, count, total, status }) => {
+                    const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : "#E17055";
+                    const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : "rgba(225,112,85,0.1)";
+                    const dateObj = new Date(now2.getFullYear(), now2.getMonth(), day);
+                    const dayName = format(dateObj, "EEE", { locale: id });
+                    return (
+                      <div key={day} className="rounded-xl p-2.5 flex flex-col gap-1"
+                        style={{ background: bg, border: `1px solid ${color}25` }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-medium" style={{ color: "var(--color-text-muted)" }}>{dayName}</span>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                        </div>
+                        <span className="text-xl font-black text-white">{day}</span>
+                        <span className="text-xs font-bold" style={{ color }}>{count}<span className="text-[9px] font-normal text-[var(--color-text-muted)]">/{total}</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="my-8 border-t border-[var(--color-border)]" />
