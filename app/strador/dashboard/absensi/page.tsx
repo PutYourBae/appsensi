@@ -106,9 +106,10 @@ export default function AbsensiPage() {
 
   const handlePreviewSave = () => {
     const changes: ChangeRecord[] = [];
+    const remote = remoteAttendance || {};
     members.forEach(m => {
       for (let day = 1; day <= TOTAL_DAYS; day++) {
-        const oldVal = isCellHadir(remoteAttendance[m.id]?.[day]);
+        const oldVal = isCellHadir(remote[m.id]?.[day]);
         const newVal = isCellHadir(attendance[m.id]?.[day]);
         if (oldVal !== newVal) {
           changes.push({

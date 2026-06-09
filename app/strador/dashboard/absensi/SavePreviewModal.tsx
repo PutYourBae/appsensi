@@ -1,6 +1,4 @@
 import { X, Save, ArrowRight, AlertCircle } from "lucide-react";
-import { format, parse } from "date-fns";
-import { id as localeId } from "date-fns/locale";
 
 export interface ChangeRecord {
   memberId: string;
@@ -19,9 +17,8 @@ interface SavePreviewModalProps {
 }
 
 export function SavePreviewModal({ changes, monthStr, onConfirm, onCancel, saving }: SavePreviewModalProps) {
-  // Parse "06-2026" to display "Juni 2026"
-  const monthDate = parse(monthStr, "MM-yyyy", new Date());
-  const monthName = format(monthDate, "MMMM yyyy", { locale: localeId });
+  // monthStr is already a display string like "Juni-2026", just clean the dash
+  const monthName = monthStr.replace("-", " ");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
