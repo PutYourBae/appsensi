@@ -130,14 +130,13 @@ export default function UserPage() {
   const dailySummary = Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1)
     .filter((day) => day <= TODAY_DAY)
     .map((day) => {
-      const isWeekendDay = weekendsSet.has(day);
       const count = activeMembers.filter((m) => {
         const cell = monthAttendance[m.id]?.[day];
         return cell === true || (typeof cell === "object" && cell !== null && (cell as Record<string, unknown>).hadir === true);
       }).length;
       const total = activeMembers.length;
-      const status = isWeekendDay ? "weekend" : count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
-      return { day, count, total, status, isWeekendDay };
+      const status = count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
+      return { day, count, total, status };
     });
 
   return (
@@ -334,24 +333,20 @@ export default function UserPage() {
                 <p className="text-center text-xs text-[var(--color-text-muted)] py-4">Belum ada data hari ini</p>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
-                  {dailySummary.map(({ day, count, total, status, isWeekendDay }) => {
-                    const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : isWeekendDay ? "#444455" : "#E17055";
-                    const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : isWeekendDay ? "rgba(30,30,45,0.4)" : "rgba(225,112,85,0.1)";
+                  {dailySummary.map(({ day, count, total, status }) => {
+                    const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : "#E17055";
+                    const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : "rgba(225,112,85,0.1)";
                     const dateObj = new Date(now2.getFullYear(), now2.getMonth(), day);
                     const dayName = format(dateObj, "EEE", { locale: id });
                     return (
                       <div key={day} className="rounded-xl p-2.5 flex flex-col gap-1"
-                        style={{ background: bg, border: `1px solid ${color}25`, opacity: isWeekendDay ? 0.45 : 1 }}>
+                        style={{ background: bg, border: `1px solid ${color}25` }}>
                         <div className="flex items-center justify-between">
                           <span className="text-[9px] font-medium" style={{ color: "var(--color-text-muted)" }}>{dayName}</span>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
                         </div>
                         <span className="text-xl font-black text-white">{day}</span>
-                        {!isWeekendDay ? (
-                          <span className="text-xs font-bold" style={{ color }}>{count}<span className="text-[9px] font-normal text-[var(--color-text-muted)]">/{total}</span></span>
-                        ) : (
-                          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color }}>Libur</span>
-                        )}
+                        <span className="text-xs font-bold" style={{ color }}>{count}<span className="text-[9px] font-normal text-[var(--color-text-muted)]" >/{total}</span></span>
                       </div>
                     );
                   })}

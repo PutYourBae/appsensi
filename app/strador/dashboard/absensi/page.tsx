@@ -18,7 +18,7 @@ import toast from "react-hot-toast";
 import { format, getDaysInMonth, isWeekend, isSameMonth, isAfter } from "date-fns";
 import { id } from "date-fns/locale";
 import { MonthSelector } from "@/components/MonthSelector";
-import { exportAttendanceCSV } from "@/lib/utils/export";
+import { exportAttendanceCSV, exportAllMonthsXLSX, MonthAttendanceData } from "@/lib/utils/export";
 
 // Dynamic date logic will be inside the component
 
@@ -35,6 +35,7 @@ export default function AbsensiPage() {
   const [showReset, setShowReset] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [exportingAll, setExportingAll] = useState(false);
 
   useEffect(() => {
     if (!hasChanges && !loadingAtt) {
@@ -87,16 +88,15 @@ export default function AbsensiPage() {
   const maxPossible = filteredMembers.length * 16; // ~16 working days so far
   const persen = maxPossible > 0 ? ((totalHadir / maxPossible) * 100).toFixed(1) : "0.0";
 
-  // Daily summary: count how many active members were present on each day (all days of month)
+  // Daily summary: count how many active members were present on each day
   const allActiveMembers = members.filter((m) => m.status === "aktif");
   const dailySummary = Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1)
     .filter((day) => day <= TODAY_DAY)
     .map((day) => {
       const count = allActiveMembers.filter((m) => isCellHadir(attendance[m.id]?.[day])).length;
       const total = allActiveMembers.length;
-      const isWeekendDay = weekends.has(day);
-      const status = isWeekendDay ? "weekend" : count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
-      return { day, count, total, status, isWeekendDay };
+      const status = count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
+      return { day, count, total, status };
     });
 
   return (
@@ -188,7 +188,52 @@ export default function AbsensiPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-80"
             style={{ background: "var(--color-bg-tertiary)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
             <Download size={14} />
-            Export CSV
+            Export Bulan Ini
+          </button>
+          <button
+            disabled={exportingAll}
+            onClick={async () => {
+              setExportingAll(true);
+              try {
+                const { getDocs, collection } = await import("firebase/firestore");
+                const snap = await getDocs(collection(db, "attendance"));
+                const year = new Date().getFullYear();
+                const activeMembers = members.filter((m) => m.status === "aktif");
+
+                // Build list of months Jan → current month
+                const nowDate = new Date();
+                const monthsData: MonthAttendanceData[] = [];
+
+                for (let m = 0; m <= nowDate.getMonth(); m++) {
+                  const monthDate = new Date(year, m, 1);
+                  const label = format(monthDate, "MMMM-yyyy", { locale: id });
+                  const docSnap = snap.docs.find((d) => d.id === label);
+                  const rawData = docSnap ? docSnap.data() : {};
+                  const { getDaysInMonth: gDIM } = await import("date-fns");
+                  monthsData.push({
+                    monthLabel: label,
+                    totalDays: gDIM(monthDate),
+                    members: activeMembers,
+                    attendance: rawData as Record<string, Record<number, unknown>>,
+                  });
+                }
+
+                exportAllMonthsXLSX(monthsData, year);
+                toast.success(`Export ${monthsData.length} bulan berhasil!`);
+              } catch {
+                toast.error("Gagal export. Coba lagi.");
+              } finally {
+                setExportingAll(false);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+            style={{ background: exportingAll ? "var(--color-bg-tertiary)" : "rgba(108,92,231,0.15)", color: exportingAll ? "var(--color-text-muted)" : "#A29BFE", border: "1px solid rgba(108,92,231,0.3)" }}>
+            {exportingAll ? (
+              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}
+            {exportingAll ? "Mengekspor..." : `Export ${new Date().getFullYear()}`}
           </button>
           <button onClick={async () => {
             await setDoc(doc(db, "attendance", monthStr), attendance);
@@ -248,27 +293,25 @@ export default function AbsensiPage() {
               <div className="py-10 text-center text-sm text-[var(--color-text-muted)]">Belum ada data hari ini</div>
             ) : (
               <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
-                {dailySummary.map(({ day, count, total, status, isWeekendDay }) => {
-                  const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : isWeekendDay ? "#444455" : "#E17055";
-                  const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : isWeekendDay ? "rgba(30,30,45,0.5)" : "rgba(225,112,85,0.1)";
-                  const label = status === "mantap" ? "Mantap" : status === "aman" ? "Aman" : isWeekendDay ? "Libur" : "Bahaya";
+                {dailySummary.map(({ day, count, total, status }) => {
+                  const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : "#E17055";
+                  const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : "rgba(225,112,85,0.1)";
+                  const label = status === "mantap" ? "Mantap" : status === "aman" ? "Aman" : "Bahaya";
                   const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
                   const dayName = format(dateObj, "EEE", { locale: id });
                   return (
                     <div key={day}
                       className="rounded-xl p-3 flex flex-col gap-1.5 transition-all hover:scale-[1.02]"
-                      style={{ background: bg, border: `1px solid ${color}30`, opacity: isWeekendDay ? 0.5 : 1 }}>
+                      style={{ background: bg, border: `1px solid ${color}30` }}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{dayName}</span>
                         <span className="w-2 h-2 rounded-full" style={{ background: color }} />
                       </div>
                       <span className="text-2xl font-black text-white">{day}</span>
-                      {!isWeekendDay && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-base font-bold" style={{ color }}>{count}</span>
-                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>/ {total}</span>
-                        </div>
-                      )}
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-base font-bold" style={{ color }}>{count}</span>
+                        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>/ {total}</span>
+                      </div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>{label}</span>
                     </div>
                   );
