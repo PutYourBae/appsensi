@@ -156,8 +156,8 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
         
         data.total_minutes_valid += overlap.duration;
         data.segments.push({
-          start: overlap.start.toISOString(),
-          end: overlap.end.toISOString(),
+          start: startTime.toISOString(),
+          end: now.toISOString(),
           duration: overlap.duration
         });
         
@@ -288,8 +288,8 @@ setInterval(async () => {
         
         data.total_minutes_valid += overlap.duration;
         data.segments.push({
-          start: overlap.start.toISOString(),
-          end: overlap.end.toISOString(),
+          start: startTime.toISOString(),
+          end: now.toISOString(),
           duration: overlap.duration
         });
         
