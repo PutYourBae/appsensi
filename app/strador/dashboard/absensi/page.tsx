@@ -10,9 +10,6 @@ import {
   Save,
   Search,
   RotateCcw,
-  Clock,
-  ChevronUp,
-  ChevronDown,
   FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -34,7 +31,7 @@ export default function AbsensiPage() {
   const { editLogs } = useEditLogs(30);
   const [attendance, setAttendance] = useState<AttendanceMonth>({});
   const [search, setSearch] = useState("");
-  const [logOpen, setLogOpen] = useState(false);
+
   const [showReset, setShowReset] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -522,50 +519,7 @@ export default function AbsensiPage() {
         </div>
       </div>
 
-      {/* Log Edit Panel */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
-        <button onClick={() => setLogOpen(!logOpen)}
-          className="w-full flex items-center gap-2.5 px-5 py-4 text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-          <Clock size={15} />
-          Log Edit
-          <span className="ml-auto px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(108,92,231,0.15)", color: "#8B7FE8" }}>
-            {editLogs.length}
-          </span>
-          {logOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        {logOpen && (
-          <div className="border-t border-[var(--color-border)]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ background: "rgba(26,26,36,0.5)" }}>
-                  {["Admin", "Keterangan Perubahan", "Waktu"].map((h) => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {editLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-5 py-6 text-center text-sm text-[var(--color-text-muted)]">
-                      Belum ada log perubahan untuk bulan ini.
-                    </td>
-                  </tr>
-                ) : editLogs.map((log) => (
-                  <tr key={log.id} className="border-t hover:bg-white/[0.02] transition-colors" style={{ borderColor: "var(--color-border-subtle)" }}>
-                    <td className="px-5 py-3 text-[var(--color-text-secondary)] text-xs">{log.adminEmail}</td>
-                    <td className="px-5 py-3 text-white text-sm">{log.changes}</td>
-                    <td className="px-5 py-3 text-[var(--color-text-muted)] font-mono text-xs">
-                      {new Date(log.timestamp).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+
     </div>
   );
 }
