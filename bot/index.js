@@ -252,6 +252,17 @@ client.on('messageCreate', async (message) => {
       return message.reply(`🕒 Halo <@${discordId}>! Kamu baru mengumpulkan **${total} menit** malam ini.\nKurang **${remaining} menit** lagi untuk dihitung Hadir (sebelum jam 01:00).`);
     }
   }
+
+  // --- COMMAND: !myid ---
+  if (message.content.toLowerCase() === '!myid') {
+    const user = message.author;
+    return message.reply(
+      `🪪 **Informasi Discord ID Kamu**\n\n` +
+      `👤 **Username:** ${user.username}\n` +
+      `🆔 **Discord ID:** \`${user.id}\`\n\n` +
+      `> Salin angka di atas dan berikan kepada Admin untuk didaftarkan di Web Absensi!`
+    );
+  }
   
   if (message.content.toLowerCase() === '!totalabsen') {
     const now = new Date();
