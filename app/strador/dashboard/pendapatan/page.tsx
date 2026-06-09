@@ -11,6 +11,7 @@ import {
   PiggyBank,
   AlertTriangle,
   Loader2,
+  ArrowUpDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -27,6 +28,7 @@ export default function PendapatanPage() {
 
   const [inputSaldo, setInputSaldo] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("pendapatan_desc");
 
   if (loadingMembers || loadingSettings || loadingAtt) {
     return <div className="p-6">Loading...</div>;
@@ -58,6 +60,20 @@ export default function PendapatanPage() {
   const totalDibagi = incomeResults.reduce((sum, r) => sum + r.pembulatan, 0);
   const eligibleCount = incomeResults.filter((r) => r.eligible).length;
   const sisaPembulatan = currentSaldo - totalDibagi;
+
+  const sortedResults = [...incomeResults].sort((a, b) => {
+    switch (sortBy) {
+      case "pendapatan_desc": return b.pembulatan - a.pembulatan;
+      case "pendapatan_asc": return a.pembulatan - b.pembulatan;
+      case "hadir_desc": return b.hadir - a.hadir;
+      case "hadir_asc": return a.hadir - b.hadir;
+      case "nama_asc": return a.memberName.localeCompare(b.memberName);
+      case "eligible_desc":
+        if (a.eligible === b.eligible) return b.pembulatan - a.pembulatan;
+        return a.eligible ? -1 : 1;
+      default: return 0;
+    }
+  });
 
   return (
     <div className="p-6 min-h-full flex flex-col gap-6">
@@ -163,8 +179,29 @@ export default function PendapatanPage() {
       <div className="rounded-2xl flex flex-col flex-1 overflow-hidden"
         style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
         
-        <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">Detail Alokasi</h3>
+        <div className="px-5 py-4 border-b border-[var(--color-border)] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h3 className="text-sm font-bold text-white">Detail Alokasi</h3>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1">
+                <ArrowUpDown size={12} /> Sort by:
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-white rounded-lg px-2 py-1 outline-none focus:border-[var(--color-accent)]"
+              >
+                <option value="pendapatan_desc">Pendapatan Tertinggi</option>
+                <option value="pendapatan_asc">Pendapatan Terendah</option>
+                <option value="hadir_desc">Kehadiran Terbanyak</option>
+                <option value="hadir_asc">Kehadiran Sedikit</option>
+                <option value="nama_asc">Nama (A-Z)</option>
+                <option value="eligible_desc">Eligible Teratas</option>
+              </select>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
             <span className="w-2 h-2 rounded-full bg-[var(--color-red)]" />
             Di bawah ambang batas (Hadir &lt; {settings?.minAbsen || 10})
@@ -184,7 +221,7 @@ export default function PendapatanPage() {
               </tr>
             </thead>
             <tbody>
-              {incomeResults.map((r, i) => (
+              {sortedResults.map((r, i) => (
                 <tr key={r.memberId} className="border-t transition-colors hover:bg-white/[0.02]" 
                   style={{ 
                     borderColor: "var(--color-border-subtle)",
