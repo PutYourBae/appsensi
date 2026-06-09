@@ -8,6 +8,7 @@ export type Member = {
   name: string;
   createdAt: string;
   status: MemberStatus;
+  discord_id?: string;
 };
 
 export type AttendanceMonth = {

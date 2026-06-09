@@ -13,7 +13,7 @@ export default function AnggotaPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "" });
+  const [formData, setFormData] = useState({ name: "", discord_id: "" });
 
   // Prioritize pending members at the top
   const sortedMembers = [...members].sort((a, b) => {
@@ -27,20 +27,30 @@ export default function AnggotaPage() {
     m.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAdd = async () => {
-    if (!formData.name) return;
-    const newId = `SOT-${String(members.length + 1).padStart(3, "0")}`;
-    const newMember: Member = { id: newId, name: formData.name, createdAt: new Date().toISOString().split("T")[0], status: "aktif" };
-    await setDoc(doc(db, "members", newId), newMember);
-    setShowAddForm(false);
-    setFormData({ name: "" });
-  };
-
-  const handleEdit = async (id: string) => {
-    if (!formData.name) return;
-    await updateDoc(doc(db, "members", id), { name: formData.name });
-    setShowEditForm(null);
-    setFormData({ name: "" });
+  const handleSubmit = async () => {
+    try {
+      if (showAddForm) {
+        // Generate new ID
+        const newId = `SOT-${String(members.length + 1).padStart(3, "0")}`;
+        await setDoc(doc(db, "members", newId), {
+          id: newId,
+          name: formData.name,
+          discord_id: formData.discord_id || "",
+          createdAt: new Date().toISOString().split("T")[0],
+          status: "aktif"
+        });
+      } else if (showEditForm) {
+        await updateDoc(doc(db, "members", showEditForm), {
+          name: formData.name,
+          discord_id: formData.discord_id || ""
+        });
+      }
+      setShowAddForm(false);
+      setShowEditForm(null);
+      setFormData({ name: "", discord_id: "" });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -110,14 +120,25 @@ export default function AnggotaPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1.5 block tracking-wide uppercase">Nama Lengkap</label>
+                <label className="block text-xs font-semibold text-[var(--color-text-muted)] mb-2 uppercase tracking-wider">Nama Lengkap</label>
                 <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Contoh: Budi Santoso"
+                  autoFocus placeholder="Contoh: Budi Santoso"
                   className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-[var(--color-text-muted)] outline-none transition-all"
-                  style={{ background: "#1A1A24", border: "1px solid #2A2A3A" }}
-                  onFocus={(e) => e.target.style.borderColor = "#6C5CE7"}
-                  onBlur={(e) => e.target.style.borderColor = "#2A2A3A"}
+                  style={{ background: "var(--color-bg-tertiary)", border: "1px solid var(--color-border)" }}
+                  onFocus={(e) => (e.target.style.borderColor = "#6C5CE7")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
                 />
+              </div>
+              <div className="mt-4">
+                <label className="block text-xs font-semibold text-[var(--color-text-muted)] mb-2 uppercase tracking-wider">Discord ID (Opsional)</label>
+                <input value={formData.discord_id} onChange={(e) => setFormData({ ...formData, discord_id: e.target.value })}
+                  placeholder="Contoh: 742394857293847291"
+                  className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-[var(--color-text-muted)] outline-none transition-all font-mono"
+                  style={{ background: "var(--color-bg-tertiary)", border: "1px solid var(--color-border)" }}
+                  onFocus={(e) => (e.target.style.borderColor = "#6C5CE7")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
+                />
+                <p className="mt-2 text-xs text-[var(--color-text-muted)]">Bot discord membutuhkan ID ini untuk memberikan absensi otomatis.</p>
               </div>
             </div>
             <div className="px-6 py-4 bg-[rgba(26,26,36,0.3)] border-t border-[var(--color-border)] flex justify-end gap-3">
@@ -142,7 +163,7 @@ export default function AnggotaPage() {
           <h2 className="text-2xl font-black text-white">Anggota Tim</h2>
           <p className="text-[var(--color-text-secondary)] text-sm mt-1">Kelola data anggota yang terdaftar di sistem.</p>
         </div>
-        <button onClick={() => { setFormData({ name: "" }); setShowAddForm(true); }}
+        <button onClick={() => { setFormData({ name: "", discord_id: "" }); setShowAddForm(true); }}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 active:scale-95 glow-accent"
           style={{ background: "linear-gradient(135deg, #7C6FF5 0%, #6C5CE7 100%)" }}>
           <Plus size={16} />
@@ -200,7 +221,16 @@ export default function AnggotaPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-[var(--color-text-secondary)] font-mono">{member.id}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[var(--color-text-secondary)] font-mono">{member.id}</span>
+                      {member.discord_id && (
+                        <span className="text-xs text-[var(--color-text-muted)] font-mono flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#5865F2]"></span> {member.discord_id}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-[var(--color-text-secondary)]">
                     {new Date(member.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
                   </td>
@@ -240,7 +270,7 @@ export default function AnggotaPage() {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setFormData({ name: member.name }); setShowEditForm(member.id); }}
+                          <button onClick={() => { setFormData({ name: member.name, discord_id: member.discord_id || "" }); setShowEditForm(member.id); }}
                             disabled={member.status !== "aktif"}
                             className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-white hover:bg-white/5 transition-all disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]">
                             <Pencil size={16} />

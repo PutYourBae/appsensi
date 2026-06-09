@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, getDoc, setDoc } = require('firebase/firestore');
+const { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where } = require('firebase/firestore');
 const { format, differenceInMinutes } = require('date-fns');
 
 // --- FIREBASE CONFIG ---
@@ -22,7 +22,9 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildPresences,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
@@ -144,7 +146,41 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
         });
         
         if (data.total_minutes_valid >= 90) {
-          data.status = "HADIR";
+          if (data.status !== "HADIR") {
+            data.status = "HADIR";
+            
+            // --- SYNC TO WEB DASHBOARD ---
+            try {
+              const membersRef = collection(db, "members");
+              const q = query(membersRef, where("discord_id", "==", discordId));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                const memberDoc = querySnapshot.docs[0];
+                const memberId = memberDoc.id;
+                
+                // Define months array in Indonesian format as used in Web (e.g. Jun-2026)
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+                const monthStr = `${monthNames[sessionDate.getMonth()]}-${sessionDate.getFullYear()}`;
+                const day = sessionDate.getDate();
+                
+                const attRef = doc(db, "attendance", monthStr);
+                
+                // Use setDoc with merge: true to avoid overwriting other members
+                await setDoc(attRef, {
+                  [memberId]: {
+                    [day]: true
+                  }
+                }, { merge: true });
+                
+                console.log(`[SYNC] Synced attendance for ${memberDoc.data().name} (${memberId}) to web dashboard.`);
+              } else {
+                console.log(`[SYNC] Discord ID ${discordId} not found in web members.`);
+              }
+            } catch (syncErr) {
+              console.error("[SYNC ERROR]", syncErr.message);
+            }
+          }
         }
         
         await setDoc(docRef, data);
@@ -154,6 +190,49 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
       }
     } else {
        console.log(`[ABSENSI] Ignored ${newPresence.user?.username || discordId} because playtime was outside 22:00-01:00 window.`);
+    }
+  }
+});
+
+// EVENT: MESSAGE (Untuk Command !cekabsen)
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  
+  if (message.content.toLowerCase() === '!cekabsen') {
+    const discordId = message.author.id;
+    let currentValidMins = 0;
+    
+    // Cek apakah sedang bermain sekarang
+    if (activeSessions.has(discordId)) {
+      currentValidMins = calculateValidMinutes(activeSessions.get(discordId), new Date());
+    }
+    
+    // Ambil data yang sudah disave di database hari ini
+    const now = new Date();
+    let sessionDate = new Date(now);
+    if (sessionDate.getHours() < 12) {
+      sessionDate.setDate(sessionDate.getDate() - 1);
+    }
+    const dateString = format(sessionDate, 'yyyy-MM-dd');
+    const docId = `${discordId}_${dateString}`;
+    
+    let dbMins = 0;
+    try {
+      const snap = await getDoc(doc(db, 'daily_sessions', docId));
+      if (snap.exists()) {
+        dbMins = snap.data().total_minutes_valid || 0;
+      }
+    } catch (e) {
+      console.error("[DB ERROR] cekabsen", e.message);
+    }
+    
+    const total = dbMins + currentValidMins;
+    
+    if (total >= 90) {
+      return message.reply(`✅ Halo <@${discordId}>! Kamu sudah mengumpulkan **${total} menit** bermain untuk shift malam ini. Status kamu **HADIR** di Web!`);
+    } else {
+      const remaining = 90 - total;
+      return message.reply(`🕒 Halo <@${discordId}>! Kamu baru mengumpulkan **${total} menit** malam ini.\nKurang **${remaining} menit** lagi untuk dihitung Hadir (sebelum jam 01:00).`);
     }
   }
 });
