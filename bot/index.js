@@ -262,6 +262,15 @@ client.on('messageCreate', async (message) => {
     const dateString = format(sessionDate, 'yyyy-MM-dd');
     
     try {
+      // 1. Tarik pemetaan Discord ID ke Nama Web (dari koleksi 'members')
+      const membersSnap = await getDocs(collection(db, "members"));
+      const webNames = new Map();
+      membersSnap.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d.discord_id) webNames.set(d.discord_id, d.name);
+      });
+
+      // 2. Tarik data sesi harian
       const q = query(collection(db, 'daily_sessions'), where('date', '==', dateString));
       const snapshot = await getDocs(q);
       
@@ -269,7 +278,8 @@ client.on('messageCreate', async (message) => {
       
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        memberStats.set(data.discord_id, { name: data.name, total: data.total_minutes_valid || 0 });
+        const finalName = webNames.get(data.discord_id) || data.name || "Seseorang";
+        memberStats.set(data.discord_id, { name: finalName, total: data.total_minutes_valid || 0 });
       });
       
       // Tambahkan menit yang sedang berjalan di memori agar Real-Time
@@ -282,12 +292,14 @@ client.on('messageCreate', async (message) => {
             const stats = memberStats.get(discordId);
             stats.total += currentValidMins;
           } else {
-            let uName = "Seseorang";
-            try {
-               const user = await client.users.fetch(discordId);
-               if (user) uName = user.username;
-            } catch(e){}
-            memberStats.set(discordId, { name: uName, total: currentValidMins });
+            let uName = webNames.get(discordId);
+            if (!uName) {
+              try {
+                 const user = await client.users.fetch(discordId);
+                 if (user) uName = user.username;
+              } catch(e){}
+            }
+            memberStats.set(discordId, { name: uName || "Seseorang", total: currentValidMins });
           }
         }
       }
