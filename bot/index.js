@@ -31,14 +31,17 @@ const client = new Client({
 // Cache memory for active sessions: { discordId: Date }
 const activeSessions = new Map();
 
-// Helper: Check if user is playing target game
 function isPlayingTargetGame(presence) {
   if (!presence || !presence.activities) return false;
   
   for (const activity of presence.activities) {
-    const actName = activity.name || "";
-    // Bawaan FiveM adalah "FiveM", namun beberapa server me-override menjadi nama servernya
-    if (actName === "FiveM" || actName.toLowerCase().includes("cerita kita")) {
+    const actName = (activity.name || "").toLowerCase();
+    const actState = (activity.state || "").toLowerCase();
+    const actDetails = (activity.details || "").toLowerCase();
+    
+    // Hanya mendeteksi jika di statusnya secara eksplisit tertulis "cerita kita"
+    // Mengecek di Name, State (biasanya nama server), atau Details
+    if (actName.includes("cerita kita") || actState.includes("cerita kita") || actDetails.includes("cerita kita")) {
       return true; 
     }
   }
