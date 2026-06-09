@@ -59,28 +59,30 @@ function isPlayingTargetGame(presence) {
   return false;
 }
 
-// Helper: Check if a time is within our valid window (22:00 to 01:00)
-function calculateValidMinutes(joinDate, dropDate) {
+// Helper: Check overlap within our valid window (22:00 to 01:00)
+function getValidOverlap(joinDate, dropDate) {
   let windowStart = new Date(joinDate);
   windowStart.setHours(22, 0, 0, 0);
   
   let windowEnd = new Date(joinDate);
   windowEnd.setHours(1, 0, 0, 0);
   
-  // If joinDate is between 00:00 and 01:00, it belongs to the *previous* day's evening window
   if (joinDate.getHours() < 12) {
     windowStart.setDate(windowStart.getDate() - 1);
   } else {
     windowEnd.setDate(windowEnd.getDate() + 1);
   }
 
-  // Find the overlap between [joinDate, dropDate] and [windowStart, windowEnd]
   const validStart = joinDate > windowStart ? joinDate : windowStart;
   const validEnd = dropDate < windowEnd ? dropDate : windowEnd;
 
-  if (validStart >= validEnd) return 0; // No valid overlap
+  if (validStart >= validEnd) return null;
 
-  return differenceInMinutes(validEnd, validStart);
+  return {
+    start: validStart,
+    end: validEnd,
+    duration: differenceInMinutes(validEnd, validStart)
+  };
 }
 
 client.once('ready', async () => {
@@ -127,9 +129,9 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
     console.log(`[DROP] ${newPresence.user?.username || discordId} stopped playing FiveM at ${now.toISOString()}`);
     activeSessions.delete(discordId);
 
-    const validMins = calculateValidMinutes(startTime, now);
-    if (validMins > 0) {
-      console.log(`[ABSENSI] ${newPresence.user?.username || discordId} played ${validMins} valid minutes.`);
+    const overlap = getValidOverlap(startTime, now);
+    if (overlap) {
+      console.log(`[ABSENSI] ${newPresence.user?.username || discordId} played ${overlap.duration} valid minutes.`);
       
       // Use the windowStart's date as the "Attendance Date" (e.g. 2026-06-09)
       let sessionDate = new Date(startTime);
@@ -152,11 +154,11 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
           segments: []
         };
         
-        data.total_minutes_valid += validMins;
+        data.total_minutes_valid += overlap.duration;
         data.segments.push({
-          start: startTime.toISOString(),
-          end: now.toISOString(),
-          duration: validMins
+          start: overlap.start.toISOString(),
+          end: overlap.end.toISOString(),
+          duration: overlap.duration
         });
         
         if (data.total_minutes_valid >= 90) {
@@ -218,7 +220,8 @@ client.on('messageCreate', async (message) => {
     
     // Cek apakah sedang bermain sekarang
     if (activeSessions.has(discordId)) {
-      currentValidMins = calculateValidMinutes(activeSessions.get(discordId), new Date());
+      const overlap = getValidOverlap(activeSessions.get(discordId), new Date());
+      currentValidMins = overlap ? overlap.duration : 0;
     }
     
     // Ambil data yang sudah disave di database hari ini
@@ -255,9 +258,9 @@ client.on('messageCreate', async (message) => {
 setInterval(async () => {
   const now = new Date();
   for (const [discordId, startTime] of activeSessions.entries()) {
-    const validMins = calculateValidMinutes(startTime, now);
+    const overlap = getValidOverlap(startTime, now);
     
-    if (validMins >= 5) { // Minimal update setiap 5 menit
+    if (overlap && overlap.duration >= 5) { // Minimal update setiap 5 menit
       let sessionDate = new Date(startTime);
       if (sessionDate.getHours() < 12) {
         sessionDate.setDate(sessionDate.getDate() - 1);
@@ -283,11 +286,11 @@ setInterval(async () => {
           if (user) data.name = user.username;
         } catch(e) {}
         
-        data.total_minutes_valid += validMins;
+        data.total_minutes_valid += overlap.duration;
         data.segments.push({
-          start: startTime.toISOString(),
-          end: now.toISOString(),
-          duration: validMins
+          start: overlap.start.toISOString(),
+          end: overlap.end.toISOString(),
+          duration: overlap.duration
         });
         
         let justReached90 = false;
