@@ -251,6 +251,93 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+// --- PATROLI REAL-TIME (Berjalan Setiap 5 Menit) ---
+setInterval(async () => {
+  const now = new Date();
+  for (const [discordId, startTime] of activeSessions.entries()) {
+    const validMins = calculateValidMinutes(startTime, now);
+    
+    if (validMins >= 5) { // Minimal update setiap 5 menit
+      let sessionDate = new Date(startTime);
+      if (sessionDate.getHours() < 12) {
+        sessionDate.setDate(sessionDate.getDate() - 1);
+      }
+      const dateString = format(sessionDate, 'yyyy-MM-dd');
+      const docId = `${discordId}_${dateString}`;
+      const docRef = doc(db, 'daily_sessions', docId);
+      
+      try {
+        const snap = await getDoc(docRef);
+        let data = snap.exists() ? snap.data() : {
+          discord_id: discordId,
+          name: "Seseorang",
+          date: dateString,
+          total_minutes_valid: 0,
+          status: "TIDAK HADIR",
+          segments: []
+        };
+        
+        // Coba perbarui nama dari cache jika memungkinkan
+        try {
+          const user = await client.users.fetch(discordId);
+          if (user) data.name = user.username;
+        } catch(e) {}
+        
+        data.total_minutes_valid += validMins;
+        data.segments.push({
+          start: startTime.toISOString(),
+          end: now.toISOString(),
+          duration: validMins
+        });
+        
+        let justReached90 = false;
+        if (data.total_minutes_valid >= 90) {
+          if (data.status !== "HADIR") {
+            data.status = "HADIR";
+            justReached90 = true;
+          }
+        }
+        
+        await setDoc(docRef, data);
+        
+        // Sangat Penting: Reset waktu mulai untuk orang ini agar tidak dihitung ganda!
+        activeSessions.set(discordId, now);
+        
+        // Sinkronisasi ke Web Dashboard secara Real-Time jika baru saja menembus 90 menit
+        if (justReached90) {
+          try {
+            const membersRef = collection(db, "members");
+            const q = query(membersRef, where("discord_id", "==", discordId));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const memberDoc = querySnapshot.docs[0];
+              const memberId = memberDoc.id;
+              
+              const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+              const monthStr = `${monthNames[sessionDate.getMonth()]}-${sessionDate.getFullYear()}`;
+              const day = sessionDate.getDate();
+              
+              const attRef = doc(db, "attendance", monthStr);
+              await setDoc(attRef, {
+                [memberId]: {
+                  [day]: true
+                }
+              }, { merge: true });
+              
+              console.log(`[PATROLI] Real-Time Sync! Absen untuk ${memberDoc.data().name} berhasil tercentang tanpa harus keluar game.`);
+            }
+          } catch (syncErr) {
+            console.error("[PATROLI SYNC ERROR]", syncErr.message);
+          }
+        }
+      } catch (e) {
+        console.error(`[PATROLI ERROR] Firebase Error for ${discordId}:`, e.message);
+      }
+    }
+  }
+}, 5 * 60 * 1000);
+
 // Login using .env token
 if (!process.env.DISCORD_BOT_TOKEN || process.env.DISCORD_BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') {
   console.error("CRITICAL ERROR: DISCORD_BOT_TOKEN is not set in .env!");
