@@ -3,6 +3,17 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where } = require('firebase/firestore');
 const { format, differenceInMinutes } = require('date-fns');
+const http = require('http');
+
+// --- DUMMY WEB SERVER (Untuk Railway Health Check) ---
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Discord Bot is running 24/7!\n');
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`[Bot] Web server listening on port ${PORT} to keep Railway alive.`);
+});
 
 // --- FIREBASE CONFIG ---
 const firebaseConfig = {
