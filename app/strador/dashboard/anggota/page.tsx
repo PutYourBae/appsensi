@@ -5,7 +5,8 @@ import { getInitials, getAvatarColor } from "@/lib/mock-data";
 import { useMembers, Member } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { Search, Plus, Pencil, Trash2, AlertCircle, X, Check } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, AlertCircle, X, Check, Clock } from "lucide-react";
+import { HistoryModal } from "./HistoryModal";
 
 export default function AnggotaPage() {
   const { members, loading } = useMembers();
@@ -13,6 +14,7 @@ export default function AnggotaPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState<{ id: string, name: string, discord_id: string } | null>(null);
   const [formData, setFormData] = useState({ name: "", discord_id: "" });
 
   // Prioritize pending members at the top
@@ -104,6 +106,14 @@ export default function AnggotaPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal History */}
+      {showHistory && (
+        <HistoryModal 
+          member={showHistory} 
+          onClose={() => setShowHistory(null)} 
+        />
       )}
 
       {/* Add/Edit Modal */}
@@ -270,6 +280,13 @@ export default function AnggotaPage() {
                         </>
                       ) : (
                         <>
+                          {member.discord_id && (
+                            <button onClick={() => setShowHistory({ id: member.id, name: member.name, discord_id: member.discord_id! })}
+                              className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[#5865F2] hover:bg-[#5865F2]/10 transition-all"
+                              title="Lihat Riwayat Bermain">
+                              <Clock size={16} />
+                            </button>
+                          )}
                           <button onClick={() => { setFormData({ name: member.name, discord_id: member.discord_id || "" }); setShowEditForm(member.id); }}
                             disabled={member.status !== "aktif"}
                             className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-white hover:bg-white/5 transition-all disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]">

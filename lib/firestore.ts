@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, doc, onSnapshot, setDoc, query, orderBy, addDoc, limit } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, query, orderBy, addDoc, limit, where } from "firebase/firestore";
 import { MemberStatus } from "./mock-data";
 
 export type Member = {
@@ -177,5 +177,53 @@ export async function logEdit(adminEmail: string, changes: string) {
     changes,
     timestamp: new Date().toISOString()
   });
+}
+
+// --- HISTORY & SESSIONS ---
+
+export type DailySession = {
+  id: string;
+  discord_id: string;
+  name: string;
+  date: string; // e.g. "2026-06-09"
+  total_minutes_valid: number;
+  status: string; // "HADIR" | "TIDAK HADIR"
+  segments: {
+    start: string;
+    end: string;
+    duration: number;
+  }[];
+};
+
+export function useMemberHistory(discordId: string | null) {
+  const [history, setHistory] = useState<DailySession[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!discordId) {
+      setHistory([]);
+      return;
+    }
+    
+    setLoading(true);
+    const q = query(
+      collection(db, "daily_sessions"),
+      where("discord_id", "==", discordId)
+    );
+    
+    // We do not use orderBy("date", "desc") because it requires a composite index
+    // if not already created. We will fetch and sort locally to be safe.
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailySession));
+      // Sort descending by date
+      data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setHistory(data);
+      setLoading(false);
+    });
+    
+    return unsub;
+  }, [discordId]);
+
+  return { history, loading };
 }
 
