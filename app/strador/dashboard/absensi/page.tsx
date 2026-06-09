@@ -87,15 +87,16 @@ export default function AbsensiPage() {
   const maxPossible = filteredMembers.length * 16; // ~16 working days so far
   const persen = maxPossible > 0 ? ((totalHadir / maxPossible) * 100).toFixed(1) : "0.0";
 
-  // Daily summary: count how many active members were present on each working day
+  // Daily summary: count how many active members were present on each day (all days of month)
   const allActiveMembers = members.filter((m) => m.status === "aktif");
   const dailySummary = Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1)
-    .filter((day) => !weekends.has(day) && day <= TODAY_DAY)
+    .filter((day) => day <= TODAY_DAY)
     .map((day) => {
       const count = allActiveMembers.filter((m) => isCellHadir(attendance[m.id]?.[day])).length;
       const total = allActiveMembers.length;
-      const status = count >= 15 ? (count > 15 ? "mantap" : "aman") : "bahaya";
-      return { day, count, total, status };
+      const isWeekendDay = weekends.has(day);
+      const status = isWeekendDay ? "weekend" : count > 15 ? "mantap" : count === 15 ? "aman" : "bahaya";
+      return { day, count, total, status, isWeekendDay };
     });
 
   return (
@@ -247,25 +248,27 @@ export default function AbsensiPage() {
               <div className="py-10 text-center text-sm text-[var(--color-text-muted)]">Belum ada data hari ini</div>
             ) : (
               <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
-                {dailySummary.map(({ day, count, total, status }) => {
-                  const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : "#E17055";
-                  const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : "rgba(225,112,85,0.1)";
-                  const label = status === "mantap" ? "Mantap" : status === "aman" ? "Aman" : "Bahaya";
+                {dailySummary.map(({ day, count, total, status, isWeekendDay }) => {
+                  const color = status === "mantap" ? "#00B894" : status === "aman" ? "#FDCB6E" : isWeekendDay ? "#444455" : "#E17055";
+                  const bg = status === "mantap" ? "rgba(0,184,148,0.1)" : status === "aman" ? "rgba(253,203,110,0.1)" : isWeekendDay ? "rgba(30,30,45,0.5)" : "rgba(225,112,85,0.1)";
+                  const label = status === "mantap" ? "Mantap" : status === "aman" ? "Aman" : isWeekendDay ? "Libur" : "Bahaya";
                   const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
                   const dayName = format(dateObj, "EEE", { locale: id });
                   return (
                     <div key={day}
                       className="rounded-xl p-3 flex flex-col gap-1.5 transition-all hover:scale-[1.02]"
-                      style={{ background: bg, border: `1px solid ${color}30` }}>
+                      style={{ background: bg, border: `1px solid ${color}30`, opacity: isWeekendDay ? 0.5 : 1 }}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>{dayName}</span>
                         <span className="w-2 h-2 rounded-full" style={{ background: color }} />
                       </div>
                       <span className="text-2xl font-black text-white">{day}</span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-base font-bold" style={{ color }}>{count}</span>
-                        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>/ {total}</span>
-                      </div>
+                      {!isWeekendDay && (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-base font-bold" style={{ color }}>{count}</span>
+                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>/ {total}</span>
+                        </div>
+                      )}
                       <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>{label}</span>
                     </div>
                   );
