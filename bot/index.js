@@ -252,6 +252,78 @@ client.on('messageCreate', async (message) => {
       return message.reply(`🕒 Halo <@${discordId}>! Kamu baru mengumpulkan **${total} menit** malam ini.\nKurang **${remaining} menit** lagi untuk dihitung Hadir (sebelum jam 01:00).`);
     }
   }
+  
+  if (message.content.toLowerCase() === '!totalabsen') {
+    const now = new Date();
+    let sessionDate = new Date(now);
+    if (sessionDate.getHours() < 12) {
+      sessionDate.setDate(sessionDate.getDate() - 1);
+    }
+    const dateString = format(sessionDate, 'yyyy-MM-dd');
+    
+    try {
+      const q = query(collection(db, 'daily_sessions'), where('date', '==', dateString));
+      const snapshot = await getDocs(q);
+      
+      const memberStats = new Map();
+      
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        memberStats.set(data.discord_id, { name: data.name, total: data.total_minutes_valid || 0 });
+      });
+      
+      // Tambahkan menit yang sedang berjalan di memori agar Real-Time
+      for (const [discordId, startTime] of activeSessions.entries()) {
+        const overlap = getValidOverlap(startTime, new Date());
+        const currentValidMins = overlap ? overlap.duration : 0;
+        
+        if (currentValidMins > 0) {
+          if (memberStats.has(discordId)) {
+            const stats = memberStats.get(discordId);
+            stats.total += currentValidMins;
+          } else {
+            let uName = "Seseorang";
+            try {
+               const user = await client.users.fetch(discordId);
+               if (user) uName = user.username;
+            } catch(e){}
+            memberStats.set(discordId, { name: uName, total: currentValidMins });
+          }
+        }
+      }
+      
+      let sudahAbsen = [];
+      let belumCukup = [];
+      
+      for (const [id, data] of memberStats.entries()) {
+        if (data.total >= 90) sudahAbsen.push(data);
+        else if (data.total > 0) belumCukup.push(data);
+      }
+      
+      let reply = `📊 **Laporan Absensi (Shift Malam ${dateString})**\n\n`;
+      
+      reply += `✅ **Sudah Absen (>= 90 menit):**\n`;
+      if (sudahAbsen.length === 0) reply += `- Belum ada\n`;
+      else {
+        sudahAbsen.sort((a,b) => b.total - a.total).forEach(m => {
+          reply += `- **${m.name}** (${m.total} menit)\n`;
+        });
+      }
+      
+      reply += `\n🕒 **Sedang/Sempat Bermain (< 90 menit):**\n`;
+      if (belumCukup.length === 0) reply += `- Tidak ada\n`;
+      else {
+        belumCukup.sort((a,b) => b.total - a.total).forEach(m => {
+          reply += `- **${m.name}** (${m.total} menit)\n`;
+        });
+      }
+      
+      return message.reply(reply);
+    } catch (e) {
+      console.error("[TOTALABSEN ERROR]", e.message);
+      return message.reply("❌ Terjadi kesalahan saat menarik data absensi.");
+    }
+  }
 });
 
 // --- PATROLI REAL-TIME (Berjalan Setiap 5 Menit) ---
