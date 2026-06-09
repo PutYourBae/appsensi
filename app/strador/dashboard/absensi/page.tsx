@@ -179,6 +179,7 @@ export default function AbsensiPage() {
               <button onClick={async () => {
                 setSaving(true);
                 try {
+                  const { getDocs, collection, deleteDoc } = await import("firebase/firestore");
                   const snap = await getDocs(collection(db, "attendance"));
                   await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
                   
