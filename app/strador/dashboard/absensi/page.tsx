@@ -13,12 +13,15 @@ import {
   Clock,
   ChevronUp,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { format, getDaysInMonth, isWeekend, isSameMonth, isAfter } from "date-fns";
 import { id } from "date-fns/locale";
 import { MonthSelector } from "@/components/MonthSelector";
 import { exportAttendanceCSV, exportAllMonthsXLSX, MonthAttendanceData } from "@/lib/utils/export";
+import { AuditLogModal } from "./AuditLogModal";
+import { SavePreviewModal, ChangeRecord } from "./SavePreviewModal";
 
 // Dynamic date logic will be inside the component
 
@@ -33,9 +36,14 @@ export default function AbsensiPage() {
   const [search, setSearch] = useState("");
   const [logOpen, setLogOpen] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [exportingAll, setExportingAll] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  const [showPreview, setShowPreview] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<ChangeRecord[]>([]);
 
   useEffect(() => {
     if (!hasChanges && !loadingAtt) {
@@ -99,6 +107,53 @@ export default function AbsensiPage() {
       return { day, count, total, status };
     });
 
+  const handlePreviewSave = () => {
+    const changes: ChangeRecord[] = [];
+    members.forEach(m => {
+      for (let day = 1; day <= TOTAL_DAYS; day++) {
+        const oldVal = isCellHadir(remoteAttendance[m.id]?.[day]);
+        const newVal = isCellHadir(attendance[m.id]?.[day]);
+        if (oldVal !== newVal) {
+          changes.push({
+            memberId: m.id,
+            memberName: m.name,
+            day,
+            oldStatus: oldVal,
+            newStatus: newVal
+          });
+        }
+      }
+    });
+    setPendingChanges(changes);
+    setShowPreview(true);
+  };
+
+  const handleConfirmSave = async () => {
+    if (!hasChanges) return;
+    setSaving(true);
+    try {
+      const currentMonthDoc = doc(db, "attendance", monthStr);
+      await setDoc(currentMonthDoc, attendance);
+      
+      const logLines = pendingChanges.map(c => 
+        `- ${c.memberName} (Tgl ${c.day}): ${c.oldStatus ? "Hadir" : "Alpha"} ➔ ${c.newStatus ? "Hadir" : "Alpha"}`
+      );
+      const detailMsg = logLines.length > 0 
+        ? `Perubahan Absensi Manual:\n${logLines.join("\n")}`
+        : `Absensi untuk bulan ${monthStr} diperbarui`;
+
+      await logEdit("admin@gtamabar.com", detailMsg);
+      
+      setHasChanges(false);
+      setShowPreview(false);
+      toast.success("Absensi berhasil disimpan");
+    } catch (e) {
+      toast.error("Gagal menyimpan absensi");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 min-h-full flex flex-col gap-5">
       {/* Reset Confirm Modal */}
@@ -122,14 +177,20 @@ export default function AbsensiPage() {
                 Batal
               </button>
               <button onClick={async () => {
-                const { getDocs, collection, deleteDoc } = await import("firebase/firestore");
-                const snap = await getDocs(collection(db, "attendance"));
-                await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-                
-                setAttendance({});
-                setShowReset(false);
-                setHasChanges(false);
-                toast.success("Seluruh data absensi berhasil dihapus");
+                setSaving(true);
+                try {
+                  const snap = await getDocs(collection(db, "attendance"));
+                  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+                  
+                  setAttendance({});
+                  setShowReset(false);
+                  setHasChanges(false);
+                  toast.success("Seluruh data absensi berhasil dihapus");
+                } catch {
+                  toast.error("Gagal mereset absensi");
+                } finally {
+                  setSaving(false);
+                }
               }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
                 style={{ background: "var(--color-red)" }}>
@@ -138,6 +199,22 @@ export default function AbsensiPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Audit Log Modal */}
+      {showAuditLog && (
+        <AuditLogModal onClose={() => setShowAuditLog(false)} />
+      )}
+
+      {/* Save Preview Modal */}
+      {showPreview && (
+        <SavePreviewModal 
+          changes={pendingChanges}
+          monthStr={monthStr}
+          saving={saving}
+          onConfirm={handleConfirmSave}
+          onCancel={() => setShowPreview(false)}
+        />
       )}
 
       {/* Stats Row */}
@@ -168,6 +245,14 @@ export default function AbsensiPage() {
             <RotateCcw size={14} />
             Reset
           </button>
+          
+          <button onClick={() => setShowAuditLog(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+            style={{ background: "rgba(0,184,148,0.1)", color: "#00b894", border: "1px solid rgba(0,184,148,0.2)" }}>
+            <FileText size={14} />
+            Riwayat Edit
+          </button>
+          
           <button
             onClick={() => {
               const activeMembers = members.filter((m) => m.status === "aktif");
@@ -235,12 +320,7 @@ export default function AbsensiPage() {
             )}
             {exportingAll ? "Mengekspor..." : `Export ${new Date().getFullYear()}`}
           </button>
-          <button onClick={async () => {
-            await setDoc(doc(db, "attendance", monthStr), attendance);
-            await logEdit("admin@gtamabar.com", `Absensi untuk bulan ${monthStr} diperbarui`);
-            setHasChanges(false);
-            toast.success("Absensi berhasil disimpan");
-          }}
+          <button onClick={handlePreviewSave}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${hasChanges ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"}`}
             style={{ background: hasChanges ? "var(--color-accent)" : "var(--color-bg-tertiary)", color: "white", border: "1px solid transparent" }}>
             <Save size={14} />
