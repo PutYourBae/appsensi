@@ -9,4 +9,5 @@ RUN npm install
 COPY bot/ ./
 
 # Run the bot
+EXPOSE 8080
 CMD ["node", "index.js"]
