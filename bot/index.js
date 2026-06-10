@@ -5,14 +5,20 @@ const { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where } =
 const { format, differenceInMinutes } = require('date-fns');
 const http = require('http');
 
+// --- CRASH HANDLERS ---
+process.on('uncaughtException', err => console.error('[FATAL] Uncaught Exception:', err));
+process.on('unhandledRejection', err => console.error('[FATAL] Unhandled Rejection:', err));
+
 // --- DUMMY WEB SERVER (Untuk Railway Health Check) ---
 const server = http.createServer((req, res) => {
+  console.log(`[HTTP] Ping received: ${req.method} ${req.url}`);
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Discord Bot is running 24/7!\n');
 });
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`[Bot] Web server listening on port ${PORT} to keep Railway alive.`);
+// Explicitly bind to 0.0.0.0 (IPv4) to ensure Railway's proxy can route to it
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Bot] Web server listening on 0.0.0.0:${PORT} to keep Railway alive.`);
 });
 
 // --- FIREBASE CONFIG ---
