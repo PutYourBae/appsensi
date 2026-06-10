@@ -123,7 +123,7 @@ function getValidOverlap(joinDate, dropDate) {
   };
 }
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`[Bot] Logged in as ${client.user.tag}!`);
   console.log(`[Bot] Scanning current members for active sessions...`);
   
