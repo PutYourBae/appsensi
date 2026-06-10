@@ -59,29 +59,67 @@ function isPlayingTargetGame(presence) {
   return false;
 }
 
-// Helper: Check overlap within our valid window (22:00 to 01:00)
+// --- TIMEZONE HELPERS (Mencegah Bug Waktu di Server Railway UTC) ---
+const WIB_OFFSET = 7 * 60 * 60 * 1000;
+
+function toWIB(date) {
+  return new Date(date.getTime() + WIB_OFFSET);
+}
+
+function getShiftDateString(date) {
+  const wibDate = toWIB(date);
+  if (wibDate.getUTCHours() < 12) {
+    wibDate.setUTCDate(wibDate.getUTCDate() - 1);
+  }
+  const yyyy = wibDate.getUTCFullYear();
+  const mm = String(wibDate.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(wibDate.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getShiftMonthString(date) {
+  const wibDate = toWIB(date);
+  if (wibDate.getUTCHours() < 12) {
+    wibDate.setUTCDate(wibDate.getUTCDate() - 1);
+  }
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+  return `${monthNames[wibDate.getUTCMonth()]}-${wibDate.getUTCFullYear()}`;
+}
+
+function getShiftDay(date) {
+  const wibDate = toWIB(date);
+  if (wibDate.getUTCHours() < 12) {
+    wibDate.setUTCDate(wibDate.getUTCDate() - 1);
+  }
+  return wibDate.getUTCDate();
+}
+
+// Helper: Check overlap within our valid window (22:00 to 01:00 WIB)
 function getValidOverlap(joinDate, dropDate) {
-  let windowStart = new Date(joinDate);
-  windowStart.setHours(22, 0, 0, 0);
+  const joinWIB = toWIB(joinDate);
+  const dropWIB = toWIB(dropDate);
   
-  let windowEnd = new Date(joinDate);
-  windowEnd.setHours(1, 0, 0, 0);
+  let windowStartWIB = new Date(joinWIB.getTime());
+  windowStartWIB.setUTCHours(22, 0, 0, 0);
   
-  if (joinDate.getHours() < 12) {
-    windowStart.setDate(windowStart.getDate() - 1);
+  let windowEndWIB = new Date(joinWIB.getTime());
+  windowEndWIB.setUTCHours(1, 0, 0, 0);
+  
+  if (joinWIB.getUTCHours() < 12) {
+    windowStartWIB.setUTCDate(windowStartWIB.getUTCDate() - 1);
   } else {
-    windowEnd.setDate(windowEnd.getDate() + 1);
+    windowEndWIB.setUTCDate(windowEndWIB.getUTCDate() + 1);
   }
 
-  const validStart = joinDate > windowStart ? joinDate : windowStart;
-  const validEnd = dropDate < windowEnd ? dropDate : windowEnd;
+  const validStart = joinWIB > windowStartWIB ? joinWIB : windowStartWIB;
+  const validEnd = dropWIB < windowEndWIB ? dropWIB : windowEndWIB;
 
   if (validStart >= validEnd) return null;
 
   return {
-    start: validStart,
-    end: validEnd,
-    duration: differenceInMinutes(validEnd, validStart)
+    start: new Date(validStart.getTime() - WIB_OFFSET),
+    end: new Date(validEnd.getTime() - WIB_OFFSET),
+    duration: Math.round((validEnd - validStart) / 60000)
   };
 }
 
@@ -133,12 +171,8 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
     if (overlap) {
       console.log(`[ABSENSI] ${newPresence.user?.username || discordId} played ${overlap.duration} valid minutes.`);
       
-      // Use the windowStart's date as the "Attendance Date" (e.g. 2026-06-09)
-      let sessionDate = new Date(startTime);
-      if (sessionDate.getHours() < 12) {
-        sessionDate.setDate(sessionDate.getDate() - 1);
-      }
-      const dateString = format(sessionDate, 'yyyy-MM-dd');
+      // Use the helper to get strictly formatted WIB shift date
+      const dateString = getShiftDateString(startTime);
       
       const docId = `${discordId}_${dateString}`;
       const docRef = doc(db, 'daily_sessions', docId);
@@ -175,10 +209,8 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
                 const memberDoc = querySnapshot.docs[0];
                 const memberId = memberDoc.id;
                 
-                // Define months array in Indonesian format as used in Web (e.g. Jun-2026)
-                const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
-                const monthStr = `${monthNames[sessionDate.getMonth()]}-${sessionDate.getFullYear()}`;
-                const day = sessionDate.getDate();
+                const monthStr = getShiftMonthString(startTime);
+                const day = getShiftDay(startTime);
                 
                 const attRef = doc(db, "attendance", monthStr);
                 
@@ -200,7 +232,7 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
         }
         
         await setDoc(docRef, data);
-        console.log(`[ABSENSI] Saved ${validMins} mins for ${discordId}. Total: ${data.total_minutes_valid}`);
+        console.log(`[ABSENSI] Saved ${overlap.duration} mins for ${discordId}. Total: ${data.total_minutes_valid}`);
       } catch (e) {
         console.error(`[ERROR] Firebase Error for ${discordId}:`, e.message);
       }
@@ -224,13 +256,9 @@ client.on('messageCreate', async (message) => {
       currentValidMins = overlap ? overlap.duration : 0;
     }
     
-    // Ambil data yang sudah disave di database hari ini
+    // Ambil data yang sudah disave di database hari ini (Pakai WIB)
     const now = new Date();
-    let sessionDate = new Date(now);
-    if (sessionDate.getHours() < 12) {
-      sessionDate.setDate(sessionDate.getDate() - 1);
-    }
-    const dateString = format(sessionDate, 'yyyy-MM-dd');
+    const dateString = getShiftDateString(now);
     const docId = `${discordId}_${dateString}`;
     
     let dbMins = 0;
@@ -266,11 +294,7 @@ client.on('messageCreate', async (message) => {
   
   if (message.content.toLowerCase() === '!totalabsen') {
     const now = new Date();
-    let sessionDate = new Date(now);
-    if (sessionDate.getHours() < 12) {
-      sessionDate.setDate(sessionDate.getDate() - 1);
-    }
-    const dateString = format(sessionDate, 'yyyy-MM-dd');
+    const dateString = getShiftDateString(now);
     
     try {
       // 1. Tarik pemetaan Discord ID ke Nama Web (dari koleksi 'members')
@@ -356,11 +380,7 @@ setInterval(async () => {
     const overlap = getValidOverlap(startTime, now);
     
     if (overlap && overlap.duration >= 5) { // Minimal update setiap 5 menit
-      let sessionDate = new Date(startTime);
-      if (sessionDate.getHours() < 12) {
-        sessionDate.setDate(sessionDate.getDate() - 1);
-      }
-      const dateString = format(sessionDate, 'yyyy-MM-dd');
+      const dateString = getShiftDateString(startTime);
       const docId = `${discordId}_${dateString}`;
       const docRef = doc(db, 'daily_sessions', docId);
       
@@ -412,9 +432,8 @@ setInterval(async () => {
               const memberDoc = querySnapshot.docs[0];
               const memberId = memberDoc.id;
               
-              const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
-              const monthStr = `${monthNames[sessionDate.getMonth()]}-${sessionDate.getFullYear()}`;
-              const day = sessionDate.getDate();
+              const monthStr = getShiftMonthString(startTime);
+              const day = getShiftDay(startTime);
               
               const attRef = doc(db, "attendance", monthStr);
               await setDoc(attRef, {
