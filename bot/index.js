@@ -88,7 +88,7 @@ function getShiftMonthString(date) {
   if (wibDate.getUTCHours() < 12) {
     wibDate.setUTCDate(wibDate.getUTCDate() - 1);
   }
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
   return `${monthNames[wibDate.getUTCMonth()]}-${wibDate.getUTCFullYear()}`;
 }
 
