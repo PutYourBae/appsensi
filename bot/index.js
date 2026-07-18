@@ -56,8 +56,8 @@ function isPlayingTargetGame(presence) {
     const actState = (activity.state || "").toLowerCase();
     const actDetails = (activity.details || "").toLowerCase();
     
-    // Mendeteksi server lama (Cerita Kita) dan server baru (Cerita Roleplay / CR Roleplay)
-    const keywords = ["cerita kita", "cerita roleplay", "cr roleplay"];
+    // Mendeteksi server baru (Cerita Roleplay / CR Roleplay)
+    const keywords = ["cerita roleplay", "cr roleplay"];
     if (keywords.some(kw => actName.includes(kw) || actState.includes(kw) || actDetails.includes(kw))) {
       return true; 
     }
