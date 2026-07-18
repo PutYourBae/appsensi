@@ -56,9 +56,9 @@ function isPlayingTargetGame(presence) {
     const actState = (activity.state || "").toLowerCase();
     const actDetails = (activity.details || "").toLowerCase();
     
-    // Hanya mendeteksi jika di statusnya secara eksplisit tertulis "cerita kita"
-    // Mengecek di Name, State (biasanya nama server), atau Details
-    if (actName.includes("cerita kita") || actState.includes("cerita kita") || actDetails.includes("cerita kita")) {
+    // Mendeteksi server lama (Cerita Kita) dan server baru (Cerita Roleplay / CR Roleplay)
+    const keywords = ["cerita kita", "cerita roleplay", "cr roleplay"];
+    if (keywords.some(kw => actName.includes(kw) || actState.includes(kw) || actDetails.includes(kw))) {
       return true; 
     }
   }
