@@ -100,17 +100,19 @@ function getShiftDay(date) {
   return wibDate.getUTCDate();
 }
 
-// Helper: Check overlap within our valid window (22:00 to 01:00 WIB)
+// Helper: Check overlap within our valid window (21:00 to 01:00 WIB)
 function getValidOverlap(joinDate, dropDate) {
   const joinWIB = toWIB(joinDate);
   const dropWIB = toWIB(dropDate);
   
   let windowStartWIB = new Date(joinWIB.getTime());
-  windowStartWIB.setUTCHours(22, 0, 0, 0);
+  windowStartWIB.setUTCHours(21, 0, 0, 0);
   
   let windowEndWIB = new Date(joinWIB.getTime());
   windowEndWIB.setUTCHours(1, 0, 0, 0);
   
+  // jam 21:00-23:59 WIB = masih sore/malam (jam >= 21)
+  // jam 00:00-01:00 WIB = dini hari (jam < 12)
   if (joinWIB.getUTCHours() < 12) {
     windowStartWIB.setUTCDate(windowStartWIB.getUTCDate() - 1);
   } else {
