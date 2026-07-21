@@ -37,14 +37,14 @@ export default function AnggotaPage() {
         await setDoc(doc(db, "members", newId), {
           id: newId,
           name: formData.name,
-          discord_id: formData.discord_id || "",
+          discord_id: formData.discord_id ? formData.discord_id.trim() : "",
           createdAt: new Date().toISOString().split("T")[0],
           status: "aktif"
         });
       } else if (showEditForm) {
         await updateDoc(doc(db, "members", showEditForm), {
           name: formData.name,
-          discord_id: formData.discord_id || ""
+          discord_id: formData.discord_id ? formData.discord_id.trim() : ""
         });
       }
       setShowAddForm(false);
