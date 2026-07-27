@@ -245,7 +245,7 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
         console.error(`[ERROR] Firebase Error for ${discordId}:`, e.message);
       }
     } else {
-       console.log(`[ABSENSI] Ignored ${newPresence.user?.username || discordId} because playtime was outside 22:00-01:00 window.`);
+       console.log(`[ABSENSI] Ignored ${newPresence.user?.username || discordId} because playtime was outside 21:00-01:00 window.`);
     }
   }
 });
