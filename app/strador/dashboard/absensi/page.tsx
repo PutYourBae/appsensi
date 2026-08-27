@@ -420,26 +420,30 @@ export default function AbsensiPage() {
         </div>
 
         {/* Grid */}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
-            <thead>
-              <tr style={{ background: "rgba(26,26,36,0.5)" }}>
-                <th className="sticky left-0 z-10 text-left px-4 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider w-48"
-                  style={{ background: "var(--color-bg-secondary)" }}>
+            <thead className="sticky top-0 z-20">
+              <tr style={{ background: "var(--color-bg-secondary)" }}>
+                <th className="sticky left-0 z-30 text-left px-4 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider w-48"
+                  style={{ background: "var(--color-bg-secondary)", borderBottom: "1px solid var(--color-border)" }}>
                   Name / ID
                 </th>
                 {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map((d) => (
                   <th key={d}
                     className="text-center py-3 text-xs font-semibold w-8"
                     style={{
-                      color: weekends.has(d) ? "var(--color-red)" : d > TODAY_DAY ? "var(--color-text-muted)" : "var(--color-text-muted)",
+                      color: weekends.has(d) ? "var(--color-red)" : "var(--color-text-muted)",
                       opacity: d > TODAY_DAY ? 0.4 : 1,
+                      borderBottom: "1px solid var(--color-border)",
+                      background: "var(--color-bg-secondary)",
                     }}>
                     {d}
                   </th>
                 ))}
-                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Total</th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">%</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider"
+                  style={{ background: "var(--color-bg-secondary)", borderBottom: "1px solid var(--color-border)" }}>Total</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider"
+                  style={{ background: "var(--color-bg-secondary)", borderBottom: "1px solid var(--color-border)" }}>%</th>
               </tr>
             </thead>
             <tbody>
